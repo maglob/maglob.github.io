@@ -2,30 +2,44 @@ config = {
   bgColor: '#FF3333',
   fgColor: '#FFFFFF',
   planetRadius: 600,
-  shipVertices: [[-5, -10], [0, -16], [5, -10], [5, 10], [9, 14], [-9, 14], [-5,10]]
+  planetPos: [300, 480 + 600 - 100],
+  G: 10000000,
+  shipVertices: [[-5, -10], [0, -16], [5, -10], [5, 10], [9, 14], [-9, 14], [-5,10]],
+  maxRuntime: 5,
+}
+
+initialState = {
+  frame: 0,
+  time: 0,
+  shipPos: [0, 200],
+  shipV: [100, 0],
+  shipAngle: Math.PI / 2,
+  shipAngleV: Math.PI*2 / 32
 }
 
 window.onload = function() {
-  window.requestAnimationFrame(tick.bind(null, init()))
+  window.requestAnimationFrame(tick.bind(null, initialState))
 }
 
-function init() {
-  return {
-    shipPos: [200, 200],
-    shipAngle: 0
-  }
-}
-
-function tick(state, dt) {
-  state = update(state, dt)
+function tick(state, time) {
+  state = update(state, time / 1000)
   render(state)
-  window.requestAnimationFrame(tick.bind(null, state))
+  if (time/1000 < config.maxRuntime)
+    window.requestAnimationFrame(tick.bind(null, state))
 }
 
-function update(state, dt) {
-  state.shipPos[0] += 1
-  state.shipAngle += .02
-  return state
+function update(oldState, newTime) {
+  var dt = newTime - oldState.time
+  var altitude = oldState.shipPos.sub(config.planetPos).norm()
+  var gravity = config.planetPos.sub(oldState.shipPos).unit().mul(config.G / (altitude * altitude))
+  return {
+    time: newTime,
+    frame: oldState.frame + 1,
+    shipPos: oldState.shipPos.add(oldState.shipV.mul(dt)),
+    shipV: oldState.shipV.add(gravity.mul(dt)),
+    shipAngle: oldState.shipAngle + oldState.shipAngleV * dt,
+    shipAngleV: oldState.shipAngleV
+  }
 }
 
 function render(state) {
@@ -36,7 +50,7 @@ function render(state) {
 
   gc.fillStyle = config.fgColor
   gc.beginPath()
-  gc.arc(canvas.width/2, canvas.height + config.planetRadius - 100, config.planetRadius, 0, Math.PI*2)
+  gc.arc(config.planetPos[0], config.planetPos[1], config.planetRadius, 0, Math.PI*2)
   gc.fill()
 
   drawShip(gc, state.shipPos[0], state.shipPos[1], state.shipAngle)
