@@ -16,8 +16,8 @@ initialState = {
   isCrash: false,
   shipPos: [300, 365],
   shipV: [0, -1],
-  thrustV: [110, -100].unit(),
-  fuel: 120
+  thrustV: [120, -100].unit(),
+  fuel: 110
 }
 
 window.onload = function() {
