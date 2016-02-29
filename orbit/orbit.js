@@ -5,9 +5,12 @@ config = {
   planetPos: [300, 480 + 600 - 100],
   G: 10000000,
   shipVertices: [[-5, -10], [0, -16], [5, -10], [5, 10], [9, 14], [-9, 14], [-5,10]],
+  exhaustVertices: [[-6,10], [6,10], [0,25]],
   enginePower: 80,
   fuelConsumption: 1,
-  maxRuntime: 60*5
+  pitchoverTime: 1,
+  maxRuntime: 60*5,
+  dt: 1 / 60
 }
 
 initialState = {
@@ -16,31 +19,34 @@ initialState = {
   isCrash: false,
   shipPos: [300, 365],
   shipV: [0, -1],
-  thrustV: [120, -100].unit(),
-  fuel: 110
+  thrustV: vectorFromAngle(0),
+  fuel: 160
 }
 
 window.onload = function() {
+  render(initialState)
   window.requestAnimationFrame(tick.bind(null, initialState))
 }
 
 function tick(state, time) {
-  state = update(state, time / 1000)
+  state = update(state, config.dt)
   render(state)
   if (!state.isCrash && (time/1000 < config.maxRuntime))
     window.requestAnimationFrame(tick.bind(null, state))
 }
 
-function update(oldState, newTime) {
-  var dt = newTime - oldState.time
+function update(oldState, dt) {
   var altitude = oldState.shipPos.sub(config.planetPos).norm()
   var gravity = config.planetPos.sub(oldState.shipPos).unit().mul(config.G / (altitude * altitude))
+  var thrust = oldState.fuel > 0
+    ? (oldState.time > config.pitchoverTime ? oldState.thrustV : [0,-1])
+    : [0, 0]
   return {
-    time: newTime,
     frame: oldState.frame + 1,
+    time: oldState.time + dt,
     shipPos: oldState.shipPos.add(oldState.shipV.mul(dt)),
-    shipV: oldState.shipV.add(gravity.mul(dt)).add(oldState.thrustV.mul(dt * config.enginePower)),
-    thrustV: oldState.fuel > 0 ? oldState.thrustV : [0, 0],
+    shipV: oldState.shipV.add(gravity.mul(dt)).add(thrust.mul(dt * config.enginePower)),
+    thrustV: oldState.thrustV,
     fuel: oldState.fuel - config.fuelConsumption,
     isCrash: config.planetPos.sub(oldState.shipPos).norm() < config.planetRadius
   }
@@ -71,6 +77,8 @@ function render(state) {
   var vx = [-vy[1], vy[0]]
   gc.transform(vx[0], vx[1], vy[0], vy[1], state.shipPos[0], state.shipPos[1])
   fillPolygon(gc, config.shipVertices)
+  if (state.fuel > 0 && state.frame % 4 >= 2)
+    fillPolygon(gc, config.exhaustVertices)
   gc.restore()
   gc.restore()
 
