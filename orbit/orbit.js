@@ -1,15 +1,8 @@
-input = {
-  thrustAngle: 0,
-  fuel: 160
-}
-
 config = {
   bgColor: '#FF3333',
   fgColor: '#FFFFFF',
   planetRadius: 600,
   planetPos: [300, 480 + 600 - 100],
-  shipInitialPos: [300, 365],
-  shipInitialV: [0, -.1],
   G: 10000000,
   shipVertices: [[-5, -10], [0, -16], [5, -10], [5, 10], [9, 14], [-9, 14], [-5,10]],
   exhaustVertices: [[-6,10], [6,10], [0,25]],
@@ -20,45 +13,59 @@ config = {
 }
 
 window.onload = function() {
-  document.getElementById('fuel').value = input.fuel
-  document.getElementById('angle').value = input.thrustAngle
+  var input = {
+    thrustAngle: 0,
+    fuel: 160
+  }
+  uiSet('fuel', input.fuel)
+  uiSet('angle', input.thrustAngle)
+
+  uiSet('planetRadius', config.planetRadius)
+  uiSet('G', config.G)
+  uiSet('enginePower', config.enginePower)
+  uiSet('fuelConsumption', config.fuelConsumption)
+  uiSet('pitchoverTime', config.pitchoverTime)
+
   var launchPressed = false
   document.getElementById('launch').addEventListener('click', function() {
     launchPressed = true
-  })
-  render(initialState())
-  window.requestAnimationFrame(tick.bind(null, initialState()))
+  });
 
-  function tick(state, time) {
+  (function tick(state) {
     if (launchPressed) {
       launchPressed = false
       input = {
-        fuel: parseFloat(document.getElementById('fuel').value),
-        thrustAngle: parseFloat(document.getElementById('angle').value)
+        fuel: parseFloat(uiGet('fuel')),
+        thrustAngle: parseFloat(uiGet('angle'))
       }
-      state = initialState()
+      config.planetRadius = parseFloat(uiGet('planetRadius'))
+      config.G = parseFloat(uiGet('G'))
+      config.enginePower = parseFloat(uiGet('enginePower'))
+      config.fuelConsumption = parseFloat(uiGet('fuelConsumption'))
+      config.pitchoverTime = parseFloat(uiGet('pitchoverTime'))
+      state = null
     }
-    if (!state.isCrash) {
-      state = update(state, config.dt)
-      render(state)
+    state = update(state, input, config.dt)
+    render(state)
+    if (state.frame % 10 == 0)
       renderStats(state)
-    }
     window.requestAnimationFrame(tick.bind(null, state))
-  }
+  })()
 }
 
-function initialState() {
-  return {
-    frame: 0,
-    time: 0,
-    isCrash: false,
-    shipPos: config.shipInitialPos,
-    shipV: config.shipInitialV,
-    fuel: input.fuel
-  }
-}
+function update(oldState, input, dt) {
+  if (!oldState)
+    return {
+      frame: 0,
+      time: 0,
+      isCrash: false,
+      shipPos: config.planetPos.add([0, -config.planetRadius - 15]),
+      shipV: [0, 0],
+      fuel: input.fuel
+    }
+  else if(oldState.isCrash)
+    return oldState
 
-function update(oldState, dt) {
   var altitude = oldState.shipPos.sub(config.planetPos).norm()
   var gravity = config.planetPos.sub(oldState.shipPos).unit().mul(config.G / (altitude * altitude))
   var thrust = oldState.fuel > 0
@@ -75,9 +82,21 @@ function update(oldState, dt) {
 }
 
 function renderStats(state) {
-  document.getElementById('time').textContent = (state.time).toFixed(2)
-  document.getElementById('speed').textContent = (state.shipV.norm()).toFixed(2)
-  document.getElementById('altitude').textContent = (state.shipPos.sub(config.planetPos).norm() - config.planetRadius).toFixed(2)
+  uiSet('time', (state.time).toFixed(2))
+  uiSet('speed', (state.shipV.norm()).toFixed(2))
+  uiSet('altitude', (state.shipPos.sub(config.planetPos).norm() - config.planetRadius).toFixed(2))
+}
+
+function uiSet(id, value) {
+  var e = document.getElementById(id)
+  if (e.value == undefined)
+    e.textContent = value
+  else
+    e.value = value
+}
+
+function uiGet(id) {
+  return document.getElementById(id).value
 }
 
 function render(state) {
@@ -100,14 +119,12 @@ function render(state) {
   fillCircle(gc, config.planetRadius)
   gc.restore()
 
-  gc.save()
-  var vy = state.shipV.unit().mul(-1)
+  var vy = state.shipV.norm() > 0 ? state.shipV.unit().mul(-1) : [0, 1]
   var vx = [-vy[1], vy[0]]
   gc.transform(vx[0], vx[1], vy[0], vy[1], state.shipPos[0], state.shipPos[1])
   fillPolygon(gc, config.shipVertices)
   if (state.fuel > 0 && state.frame % 4 >= 2)
     fillPolygon(gc, config.exhaustVertices)
-  gc.restore()
   gc.restore()
 
   document.getElementById('crash').style.display = state.isCrash ? 'block' : 'none'
