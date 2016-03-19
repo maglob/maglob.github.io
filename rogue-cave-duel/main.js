@@ -1,19 +1,41 @@
 window.onload = function() {
-  var canvas = document.getElementById('canvas')
-  var gc = gfxInitialize(canvas, shaders)
+  var gc = gfxInitialize(document.getElementById('canvas'), shaders)
+  var input = {
+    left: false,
+    right: false,
+    thrust: false,
+    pauseToggle: false
+  }
   window.addEventListener('resize', resize)
+  window.addEventListener('keydown', readkeys.bind(input, true))
+  window.addEventListener('keyup', readkeys.bind(input, false))
+
   resize();
+  var pause = false;
 
   (function tick(state, time) {
-    state = gameUpdate(state, 1/60)
-    gc.render(state)
+    if (input.pauseToggle) {
+      pause = !pause
+      input.pauseToggle = false
+    }
+    if (!pause) {
+      state = gameUpdate(state, 1 / 60)
+      gc.render(state)
+    }
     window.requestAnimationFrame(tick.bind(null, state))
-  })(gameInitialize())
+  })(gameInitialize(input))
 
   function resize() {
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-    gc.resize(canvas.width, canvas.height)
+    gc.resize(window.innerWidth, window.innerHeight)
+  }
+
+  function readkeys(isDown, e) {
+    switch (e.keyCode) {
+      case 65: this.left = isDown; break;
+      case 68: this.right = isDown; break;
+      case 87: this.thrust = isDown; break;
+      case 32: this.pauseToggle = isDown; break;
+    }
   }
 }
 
