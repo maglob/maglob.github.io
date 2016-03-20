@@ -1,5 +1,11 @@
 window.onload = function() {
-  var gc = gfxInitialize(document.getElementById('canvas'), shaders)
+  var config = {
+    caveColor: [1, 1, 0, 1],
+    shipColor: [1, 1, 1, 1],
+    rockColor: [1, 0, 0, 1],
+    backgroundColor: [.1, .1, .1, 1]
+  }
+  var gc = gfxInitialize(document.getElementById('canvas'), shaders, config)
   var input = {
     left: false,
     right: false,
