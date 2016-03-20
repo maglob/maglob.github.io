@@ -18,11 +18,21 @@ Array.prototype.unit = function() {
   return this.mul(1 / this.norm())
 }
 
+Array.prototype.orto = function() {
+  return [-this[1], this[0]]
+}
+
 Array.prototype.angle = function() {
   var a = Math.atan(this[1] / this[0])
   return  this[0] >= 0
     ? (this[1] > 0 ? 2*Math.PI - a : -a)
     : Math.PI - a
+}
+
+Array.prototype.rotate = function(a) {
+  var ca = Math.cos(a)
+  var sa = Math.sin(a)
+  return [this[0]*ca - this[1]*sa, this[0]*sa + this[1]*ca]
 }
 
 function vectorFromAngle(a) {
@@ -35,7 +45,7 @@ Array.prototype.flatten = function() {
 
 function regularPolygon(n) {
   return range(n).map(function(e) {
-    return vectorFromAngle(Math.PI * 2 / n * e)
+    return vectorFromAngle(-Math.PI * 2 / n * e)
   })
 }
 
@@ -100,4 +110,20 @@ Matrix.prototype.mul = function(other) {
 
 Matrix.prototype.toString = function() {
   return "[" + this.data.map(function(e) { return "[" + e.join(" ") + "]" }).join(" ") + "]"
+}
+
+function Edge(a, b) {
+  this.a = a
+  this.b = b
+  this.vector = b.sub(a)
+  this.unit = this.vector.unit()
+  this.normal = this.unit.orto()
+}
+
+Edge.prototype.inside = function(pos) {
+  return pos.sub(this.a).mul(this.normal) > 0
+}
+
+Edge.prototype.intersects = function(other) {
+  return this.inside(other.a) != this.inside(other.b)  &&  other.inside(this.a) != other.inside(this.b)
 }
