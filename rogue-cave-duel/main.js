@@ -1,5 +1,8 @@
 window.onload = function() {
   var config = {
+    gravity: [0, -30],
+    friction: 0.1,
+    turnSpeed: 4,
     caveColor: [1, 1, 0, 1],
     shipColor: [1, 1, 1, 1],
     rockColor: [1, 0, 0, 1],
@@ -19,17 +22,17 @@ window.onload = function() {
   resize();
   var pause = false;
 
-  (function tick(state, time) {
+  (function tick(state) {
     if (input.pauseToggle) {
       pause = !pause
       input.pauseToggle = false
     }
     if (!pause) {
-      state = gameUpdate(state, 1 / 60)
+      state = gameUpdate(state, input, config, 1 / 60)
       gc.render(state)
     }
     window.requestAnimationFrame(tick.bind(null, state))
-  })(gameInitialize(input))
+  })(gameInitialize())
 
   function resize() {
     gc.resize(window.innerWidth, window.innerHeight)
@@ -39,6 +42,7 @@ window.onload = function() {
     switch (e.keyCode) {
       case 65: this.left = isDown; break;
       case 68: this.right = isDown; break;
+      case 16:
       case 87: this.thrust = isDown; break;
       case 32: this.pauseToggle = isDown; break;
     }
