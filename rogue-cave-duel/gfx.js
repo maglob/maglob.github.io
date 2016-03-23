@@ -1,32 +1,55 @@
 
-function gfxRender(gl, program, config, state) {
+function gfxRender(gl, ctx, config, state) {
   var baseMatrix = Matrix.scale(2 / gl.canvas.width, 2 / gl.canvas.height)
-  gl.clearColor.apply(gl, config.backgroundColor)
-  gl.clear(gl.COLOR_BUFFER_BIT)
 
-  gl.useProgram(program.id)
-  gl.enableVertexAttribArray(program.attribute.pos)
-  gl.lineWidth(2)
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.framebuffer)
+  withProgram(ctx.program, function(prg) {
+    gl.clearColor.apply(gl, config.backgroundColor)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    gl.lineWidth(2)
+    gl.uniform4fv(prg.uniform.color, new Float32Array(config.caveColor))
+    gl.uniformMatrix3fv(prg.uniform.matrix, false, new Float32Array(baseMatrix.transpose().data.flatten()))
+    drawArray(state.cave.vertices, prg.attribute.pos, gl.LINE_LOOP)
+    state.ships.forEach(drawSprite.bind(null, config.shipColor))
+    state.rocks.forEach(drawSprite.bind(null, config.rockColor))
+  })
 
-  gl.uniform4fv(program.uniform.color, new Float32Array(config.caveColor))
-  gl.uniformMatrix3fv(program.uniform.matrix, false, new Float32Array(baseMatrix.transpose().data.flatten()))
-  drawArray(state.cave.vertices, gl.LINE_LOOP)
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  withProgram(ctx.programTexture, function(prg) {
+    gl.uniformMatrix3fv(prg.uniform.matrix, false, new Matrix().data.flatten())
+    gl.uniform1i(prg.uniform.sampler, 0)
+    gl.bindTexture(gl.TEXTURE_2D, ctx.texture)
+    var buffer2 = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer2)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 1, 1, 1, 0, 0, 1, 0]), gl.STREAM_DRAW)
+    gl.vertexAttribPointer(prg.attribute.texPos, 2, gl.FLOAT, false, 0, 0)
+    drawArray([[-1, 1], [1, 1], [-1, -1], [1, -1]], prg.attribute.pos, gl.TRIANGLE_STRIP)
+    gl.deleteBuffer(buffer2)
+  })
 
-  state.ships.forEach(drawSprite.bind(null, config.shipColor))
-  state.rocks.forEach(drawSprite.bind(null, config.rockColor))
-
-  function drawSprite(color, sprite) {
-    gl.uniform4fv(program.uniform.color, new Float32Array(color))
-    var matrix = baseMatrix.mul(Matrix.translate(sprite.pos[0], sprite.pos[1])).mul(Matrix.rotate(sprite.angle))
-    gl.uniformMatrix3fv(program.uniform.matrix, false, new Float32Array(matrix.transpose().data.flatten()))
-    drawArray(sprite.mesh.vertices, gl.LINE_LOOP)
+  function withProgram(program, fn) {
+    gl.useProgram(program.id)
+    Object.keys(program.attribute).forEach(function(e) {
+      gl.enableVertexAttribArray(program.attribute[e])
+    })
+    fn(program)
+    Object.keys(program.attribute).forEach(function(e) {
+      gl.disableVertexAttribArray(program.attribute[e])
+    })
   }
 
-  function drawArray(points, mode) {
+  function drawSprite(color, sprite) {
+    gl.uniform4fv(ctx.program.uniform.color, new Float32Array(color))
+    var matrix = baseMatrix.mul(Matrix.translate(sprite.pos[0], sprite.pos[1])).mul(Matrix.rotate(sprite.angle))
+    gl.uniformMatrix3fv(ctx.program.uniform.matrix, false, new Float32Array(matrix.transpose().data.flatten()))
+    drawArray(sprite.mesh.vertices, ctx.program.attribute.pos, gl.LINE_LOOP)
+  }
+
+  function drawArray(points, attribute, mode) {
     var buffer = gl.createBuffer()
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(points.flatten()), gl.STREAM_DRAW)
-    gl.vertexAttribPointer(program.attribute.pos, 2, gl.FLOAT, false, 0, 0)
+    gl.vertexAttribPointer(attribute, 2, gl.FLOAT, false, 0, 0)
     gl.drawArrays(mode, 0, points.length)
     gl.deleteBuffer(buffer)
   }
@@ -34,14 +57,27 @@ function gfxRender(gl, program, config, state) {
 
 function gfxInitialize(canvas, shaders, config) {
   var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl")
-  var program = createProgram(shaders['constant.vert'], shaders['constant.frag'], ['color', 'matrix'], ['pos'])
+  var ctx = {
+    program: createProgram(shaders['constant.vert'], shaders['constant.frag'], ['color', 'matrix'], ['pos']),
+    programTexture: createProgram(shaders['texture.vert'], shaders['texture.frag'], ['sampler', 'matrix'], ['pos', 'texPos']),
+    framebuffer: gl.createFramebuffer(),
+    texture: gl.createTexture()
+  }
+  gl.bindTexture(gl.TEXTURE_2D, ctx.texture)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.framebuffer)
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ctx.texture, 0)
 
   return {
-    render: gfxRender.bind(null, gl, program, config),
+    render: gfxRender.bind(null, gl, ctx, config),
     resize: function(width, height) {
       canvas.width = width
       canvas.height = height
       gl.viewport(0, 0, width, height)
+      gl.bindTexture(gl.TEXTURE_2D, ctx.texture)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.canvas.width, gl.canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     }
   }
 
