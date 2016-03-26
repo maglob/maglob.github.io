@@ -2,7 +2,7 @@
 function gfxRender(gl, ctx, config, state) {
   var baseMatrix = Matrix.scale(2 / gl.canvas.width, 2 / gl.canvas.height)
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.framebuffers[0].id)
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   withProgram(ctx.program, function(prg) {
     gl.clearColor.apply(gl, config.backgroundColor)
     gl.clear(gl.COLOR_BUFFER_BIT)
@@ -12,19 +12,33 @@ function gfxRender(gl, ctx, config, state) {
     drawArray(state.cave.vertices, prg.attribute.pos, gl.LINE_LOOP)
     state.ships.forEach(drawSprite.bind(null, config.shipColor))
     state.rocks.forEach(drawSprite.bind(null, config.rockColor))
-  });
+  })
 
-  [ctx.effectBlur, ctx.effectBlur].forEach(function(effect, i, array) {
-    var isLast = i == (array.length - 1)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, isLast ? null : ctx.framebuffers[(i+1)%2].id)
-    withProgram(effect, function(prg) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.framebuffers[0].id)
+  withProgram(ctx.program, function(prg) {
+    gl.clearColor.apply(gl, [0, 0, 0, 1])
+    gl.clear(gl.COLOR_BUFFER_BIT)
+    gl.lineWidth(2)
+    gl.uniform4fv(prg.uniform.color, new Float32Array([1, 1, 1, 1]))
+    gl.uniformMatrix3fv(prg.uniform.matrix, false, new Float32Array(baseMatrix.transpose().data.flatten()))
+    drawArray(state.cave.vertices, prg.attribute.pos, gl.LINE_LOOP)
+  })
+
+  doBlur(ctx.framebuffers[0], ctx.framebuffers[1], [1.0/gl.canvas.width, 0])
+  gl.enable(gl.BLEND)
+  gl.blendFunc(gl.ONE, gl.ONE)
+  doBlur(ctx.framebuffers[1], null, [0, 1.0/gl.canvas.height])
+  gl.disable(gl.BLEND)
+
+  function doBlur(srcFramebuffer, destFramebuffer, delta) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, destFramebuffer ? destFramebuffer.id : null)
+    withProgram(ctx.effectBlur, function(prg) {
       gl.uniform1i(prg.uniform.sampler, 0)
-      var delta = i==0 ? [1.0/gl.canvas.width, 0] : [0, 1.0/gl.canvas.height]
       gl.uniform2fv(prg.uniform.delta, new Float32Array(delta))
-      gl.bindTexture(gl.TEXTURE_2D, ctx.framebuffers[i%2].texture)
+      gl.bindTexture(gl.TEXTURE_2D, srcFramebuffer.texture)
       drawArray([[-1, 1, 0, 1], [1, 1, 1, 1], [-1, -1, 0, 0], [1, -1, 1, 0]], prg.attribute.vertex, gl.TRIANGLE_STRIP)
     })
-  })
+  }
 
   function withProgram(program, fn) {
     gl.useProgram(program.id)
