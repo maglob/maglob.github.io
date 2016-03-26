@@ -3,6 +3,7 @@ function gfxRender(gl, ctx, config, state) {
   var baseMatrix = Matrix.scale(2 / gl.canvas.width, 2 / gl.canvas.height)
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
   withProgram(ctx.program, function(prg) {
     gl.clearColor.apply(gl, config.backgroundColor)
     gl.clear(gl.COLOR_BUFFER_BIT)
@@ -14,24 +15,26 @@ function gfxRender(gl, ctx, config, state) {
     state.rocks.forEach(drawSprite.bind(null, config.rockColor))
   })
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.framebuffers[0].id)
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.framebuffers[2].id)
+  gl.viewport(0, 0, ctx.framebuffers[2].width, ctx.framebuffers[2].height)
   withProgram(ctx.program, function(prg) {
     gl.clearColor.apply(gl, [0, 0, 0, 1])
     gl.clear(gl.COLOR_BUFFER_BIT)
     gl.lineWidth(2)
-    gl.uniform4fv(prg.uniform.color, new Float32Array([1, 1, 1, 1]))
+    gl.uniform4fv(prg.uniform.color, new Float32Array([1, 1, .3, 1]))
     gl.uniformMatrix3fv(prg.uniform.matrix, false, new Float32Array(baseMatrix.transpose().data.flatten()))
     drawArray(state.cave.vertices, prg.attribute.pos, gl.LINE_LOOP)
   })
 
-  doBlur(ctx.framebuffers[0], ctx.framebuffers[1], [1.0/gl.canvas.width, 0])
+  doBlur(ctx.framebuffers[2], ctx.framebuffers[3], [1.0/gl.canvas.width, 0])
   gl.enable(gl.BLEND)
   gl.blendFunc(gl.ONE, gl.ONE)
-  doBlur(ctx.framebuffers[1], null, [0, 1.0/gl.canvas.height])
+  doBlur(ctx.framebuffers[3], null, [0, 1.0/gl.canvas.height])
   gl.disable(gl.BLEND)
 
   function doBlur(srcFramebuffer, destFramebuffer, delta) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, destFramebuffer ? destFramebuffer.id : null)
+    gl.viewport(0, 0, destFramebuffer ? destFramebuffer.width : gl.canvas.width, destFramebuffer ? destFramebuffer.height : gl.canvas.height)
     withProgram(ctx.effectBlur, function(prg) {
       gl.uniform1i(prg.uniform.sampler, 0)
       gl.uniform2fv(prg.uniform.delta, new Float32Array(delta))
@@ -73,7 +76,7 @@ function gfxRender(gl, ctx, config, state) {
 
 function gfxInitialize(canvas, shaders, config) {
   var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl")
-  var framebuffers = range(2).map(function() {
+  var framebuffers = range(4).map(function(i) {
     var id = gl.createFramebuffer()
     var texture = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D, texture)
@@ -84,7 +87,8 @@ function gfxInitialize(canvas, shaders, config) {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0)
     return {
       id: id,
-      texture: texture
+      texture: texture,
+      scale: i < 2 ? 1 : 0.5
     }
   })
   var ctx = {
@@ -104,10 +108,11 @@ function gfxInitialize(canvas, shaders, config) {
     resize: function(width, height) {
       canvas.width = width
       canvas.height = height
-      gl.viewport(0, 0, width, height)
       ctx.framebuffers.forEach(function(fb) {
+        fb.width = gl.canvas.width * fb.scale
+        fb.height = gl.canvas.height * fb.scale
         gl.bindTexture(gl.TEXTURE_2D, fb.texture)
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.canvas.width, gl.canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, fb.width, fb.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
       })
     }
   }
