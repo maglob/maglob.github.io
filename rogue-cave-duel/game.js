@@ -33,9 +33,7 @@ function gameUpdate(state, input, config, dt) {
       s.angle -= config.turnSpeed * dt
     if (input.thrust) {
       s.v = s.v.add(vectorFromAngle(s.angle).mul(200 * dt))
-      var spread = Math.PI/3
-      var a = s.angle + Math.PI + Math.random()*spread - spread/2
-      state.thrustParticles.emit(s.pos, s.v.add(vectorFromAngle(a).mul(100)))
+      state.thrustParticles.emit(s, 3)
     }
     s.v = s.v.add(config.gravity.mul(dt))
     s.v = s.v.mul(Math.pow(1 - config.friction, dt))
@@ -84,7 +82,7 @@ function gameInitialize() {
       )
     ],
     shots: [],
-    thrustParticles: new ParticleSystem(100, [0, -20], 0.4, 1)
+    thrustParticles: new ParticleSystem(1000, [0, -20], 0.3, .6, Math.PI/2.5, Math.PI, 6, 50)
   }
 }
 
@@ -134,19 +132,25 @@ Mesh.prototype.intersects = function(other) {
   return false
 }
 
-function ParticleSystem(maxCount, gravity, friction, ttl) {
+function ParticleSystem(maxCount, gravity, friction, ttl, spread, angle, initialDistance, initialSpeed) {
   this.maxCount = maxCount || 100
   this.gravity = gravity || [0, 0]
   this.friction = friction || 0
   this.ttl = ttl || 1
+  this.spread = spread || Math.PI * 2
+  this.angle = angle || 0
+  this.initialSpeed = initialSpeed || 0
+  this.initialDistance = initialDistance || 0
   this.particles = []
 }
 
-ParticleSystem.prototype.emit = function (pos, v) {
-  if (this.particles.length < this.maxCount) {
+ParticleSystem.prototype.emit = function (parent, n) {
+  n = n || 1
+  while (n-- > 0 && this.particles.length < this.maxCount) {
     var s = new Sprite()
-    s.pos = pos
-    s.v = v
+    var a = parent.angle + this.angle + Math.random()*this.spread - this.spread/2
+    s.pos = parent.pos.add(vectorFromAngle(a).mul(this.initialDistance))
+    s.v = parent.v.add(vectorFromAngle(a).mul(this.initialSpeed))
     s.ttl = this.ttl - Math.random()*this.ttl/2
     this.particles.push(s)
   }
