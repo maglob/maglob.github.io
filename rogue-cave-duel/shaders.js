@@ -91,19 +91,21 @@ shaders = {
   "uniform vec4 color; \n"+
   " \n"+
   "void main() { \n"+
-  "    gl_FragColor = color; \n"+
+  "    if (distance(vec2(0.5, 0.5), gl_PointCoord) < 0.5) \n"+
+  "        gl_FragColor = color; \n"+
+  "    else \n"+
+  "        discard; \n"+
   "} \n"+
   "",
   'particle.vert':
   "#version 100 \n"+
   " \n"+
   "uniform mat3 matrix; \n"+
-  "uniform float size; \n"+
-  "attribute vec2 pos; \n"+
+  "attribute vec3 data; \n"+
   " \n"+
   "void main() { \n"+
-  "    gl_Position = vec4(matrix * vec3(pos, 1), 1); \n"+
-  "    gl_PointSize = size; \n"+
+  "    gl_Position = vec4(matrix * vec3(data.xy, 1), 1); \n"+
+  "    gl_PointSize = data[2]; \n"+
   "} \n"+
   ""
 }
