@@ -1,9 +1,6 @@
 
 function gfxRender(gl, ctx, config, state) {
-  var baseMatrix = Matrix.scale(2 / gl.canvas.width, 2 / gl.canvas.height)
-
-  var offset = state.ships[0].pos.mul(-1)
-  baseMatrix = baseMatrix.mul(Matrix.translate(offset[0], offset[1]))
+  var baseMatrix = Matrix.scale(2 / gl.canvas.width, 2 / gl.canvas.height).translate(state.ships[0].pos.mul(-1))
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
@@ -16,12 +13,18 @@ function gfxRender(gl, ctx, config, state) {
     drawArray(state.cave.vertices, prg.attribute.pos, gl.LINE_LOOP)
     state.ships.forEach(drawSprite.bind(null, config.shipColor))
     state.rocks.forEach(drawSprite.bind(null, config.rockColor))
+  })
+
+  withProgram(ctx.programParticle, function(prg) {
+    gl.uniformMatrix3fv(prg.uniform.matrix, false, new Float32Array(baseMatrix.transpose().data.flatten()))
     gl.uniform4fv(prg.uniform.color, new Float32Array(config.shotColor))
+    gl.uniform1f(prg.uniform.size, 3)
     gl.uniformMatrix3fv(prg.uniform.matrix, false, baseMatrix.transpose().data.flatten())
-    drawArray(state.shots.map(function(s) { return s.pos }), prg.attribute.pos, gl.POINTS)
+    drawArray(state.shots.map(function (s) { return s.pos }), prg.attribute.pos, gl.POINTS)
+    gl.uniform4fv(prg.uniform.color, new Float32Array(config.thrustColor))
+    gl.uniform1f(prg.uniform.size, 4)
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE)
-    gl.uniform4fv(prg.uniform.color, new Float32Array(config.thrustColor))
     drawArray(state.thrustParticles.particles.map(function(p) { return p.pos }), prg.attribute.pos, gl.POINTS)
     gl.disable(gl.BLEND)
   })
@@ -70,7 +73,7 @@ function gfxRender(gl, ctx, config, state) {
 
   function drawSprite(color, sprite) {
     gl.uniform4fv(ctx.program.uniform.color, new Float32Array(color))
-    var matrix = baseMatrix.mul(Matrix.translate(sprite.pos[0], sprite.pos[1])).mul(Matrix.rotate(sprite.angle))
+    var matrix = baseMatrix.translate(sprite.pos).rotate(sprite.angle)
     gl.uniformMatrix3fv(ctx.program.uniform.matrix, false, new Float32Array(matrix.transpose().data.flatten()))
     drawArray(sprite.mesh.vertices, ctx.program.attribute.pos, gl.LINE_LOOP)
   }
@@ -109,6 +112,7 @@ function gfxInitialize(canvas, shaders, config) {
   })
   var ctx = {
     program: createProgram(shaders['constant.vert'], shaders['constant.frag'], ['color', 'matrix'], ['pos']),
+    programParticle: createProgram(shaders['particle.vert'], shaders['particle.frag'], ['color', 'matrix', 'size'], ['pos']),
     effectGrayscale: createProgram(shaders['effect.vert'], shaders['grayscale.frag'], ['sampler'], ['vertex']),
     effectDither: createProgram(shaders['effect.vert'], shaders['dither.frag'], ['sampler'], ['vertex']),
     effectBlur: createProgram(shaders['effect.vert'], shaders['blur.frag'], ['sampler', 'delta', 'kernel', 'kernel_size'], ['vertex']),
