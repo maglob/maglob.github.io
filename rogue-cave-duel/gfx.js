@@ -1,6 +1,6 @@
 
 function gfxRender(gl, ctx, config, state) {
-  var baseMatrix = Matrix.scale(2 / gl.canvas.width, 2 / gl.canvas.height).translate(state.ships[0].pos.mul(-1))
+  var baseMatrix = Matrix.scale(2 / gl.canvas.width, 2 / gl.canvas.height).translate(state.offset.mul(-1))
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
@@ -10,7 +10,7 @@ function gfxRender(gl, ctx, config, state) {
     gl.clearColor.apply(gl, config.backgroundColor)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
 
-    var caveTriangles = new Mesh(state.cave.vertices).triangles().flatten()
+    var caveTriangles = new Mesh(state.cave.mesh.vertices).triangles().flatten()
     makeStencil(function() {
       gl.uniform4fv(prg.uniform.color, new Float32Array(config.caveBackgroundColor))
       drawArray(caveTriangles, prg.attribute.pos, gl.TRIANGLES)
@@ -22,7 +22,7 @@ function gfxRender(gl, ctx, config, state) {
     gl.lineWidth(2)
     gl.uniform4fv(prg.uniform.color, new Float32Array(config.caveColor))
     gl.uniformMatrix3fv(prg.uniform.matrix, false, new Float32Array(baseMatrix.transpose().data.flatten()))
-    drawArray(state.cave.vertices, prg.attribute.pos, gl.LINE_LOOP)
+    drawArray(state.cave.mesh.vertices, prg.attribute.pos, gl.LINE_LOOP)
     state.ships.forEach(drawSprite.bind(null, config.shipColor))
     state.rocks.forEach(drawSprite.bind(null, config.rockColor))
   })
@@ -54,7 +54,7 @@ function gfxRender(gl, ctx, config, state) {
     gl.lineWidth(2)
     gl.uniform4fv(prg.uniform.color, new Float32Array([1, 1, .3, 1]))
     gl.uniformMatrix3fv(prg.uniform.matrix, false, new Float32Array(baseMatrix.transpose().data.flatten()))
-    drawArray(state.cave.vertices, prg.attribute.pos, gl.LINE_LOOP)
+    drawArray(state.cave.mesh.vertices, prg.attribute.pos, gl.LINE_LOOP)
   })
 
   doBlur(ctx.framebuffers[2], ctx.framebuffers[3], [1.0/gl.canvas.width, 0])
@@ -168,6 +168,9 @@ function gfxInitialize(canvas, shaders, config) {
         gl.bindTexture(gl.TEXTURE_2D, fb.texture)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, fb.width, fb.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
       })
+    },
+    getSize: function() {
+      return [canvas.width, canvas.height]
     }
   }
 
