@@ -76,10 +76,10 @@ window.onload = function() {
           return mousePos.sub(a).norm() < mousePos.sub(b).norm() ? a : b
         })
         if (v.sub(mousePos).norm() < 8)
-          input.selection = state.cave.points.indexOf(v)
+          selection = state.cave.points.indexOf(v)
       }
       if (selection >= 0) {
-        state.cave.points[input.selection] = mousePos
+        state.cave.points[selection] = mousePos
         state.cave.mesh = new Mesh(bezierPath(state.cave.points, 8))
       }
     } else
