@@ -39,6 +39,7 @@ function gameUpdate(state, input, config, dt) {
         s.ttl = -1
         if (s.mesh) {
           state.explosions.emit(30, new Sprite(null, s.pos))
+          state.shards.emit(100, new Sprite(null, s.pos))
           s.mesh.edges.forEach(function(e) {
             var mp = e.a.add(e.vector.mul(genUniform(.1,.9)()))
             var debris = new Sprite(new Mesh([e.a.sub(mp), e.b.sub(mp)]), s.pos.add(mp))
@@ -67,8 +68,9 @@ function gameUpdate(state, input, config, dt) {
     ships: state.ships,
     shots: state.shots.filter(function(s) { return s.ttl >= 0 }),
     debris: state.debris.filter(function(s) { return s.ttl >= 0 }),
-    thrustParticles: state.thrustParticles.update(dt),
+    thrustParticles: state.thrustParticles.update(dt, state.cave.mesh.edges),
     explosions: state.explosions.update(dt),
+    shards: state.shards.update(dt, state.cave.mesh.edges),
     lastShotTime: state.lastShotTime,
     offset: state.ships[0].pos
   }
@@ -169,8 +171,9 @@ function gameInitialize() {
     ],
     shots: [],
     debris: [],
-    thrustParticles: new ParticleSystem(1000, [0, -20], 0.3, genUniform(.4, .8), genUniform(Math.PI-Math.PI/4.4, Math.PI+Math.PI/4.4), 6, 50),
-    explosions: new ParticleSystem(1000, [0,0], 0.95, genUniform(0.35, 0.7), genUniform(0, Math.PI*2), genUniform(0, 30), 100),
+    thrustParticles: new ParticleSystem(1000, [0, -20], 0.3, genUniform(.4, .8), genUniform(Math.PI-Math.PI/4.4, Math.PI+Math.PI/4.4), 6, genUniform(40, 50)),
+    explosions: new ParticleSystem(1000, [0,0], 0.95, genUniform(0.45,.9), genUniform(0, Math.PI*2), genUniform(0, 30), genUniform(30, 100)),
+    shards: new ParticleSystem(1000, [0, -120], 0.3, genUniform(1.7, 2.4), genUniform(0, Math.PI*2), genUniform(0, 30), genUniform(50, 100)),
     lastShotTime: 0,
     offset: [0, 0]
   }
@@ -270,6 +273,28 @@ Mesh.prototype.intersects = function(other) {
   return false
 }
 
+Mesh.prototype.boundingBox = function() {
+  var first = this.vertices[0]
+  var box = this.vertices.reduce(function(box, e) {
+    return {
+      maxX: Math.max(box.maxX, e[0]),
+      minX: Math.min(box.minX, e[0]),
+      maxY: Math.max(box.maxY, e[1]),
+      minY: Math.min(box.minY, e[1])
+    }
+  }, {
+      maxX: first[0],
+      minX: first[0],
+      maxY: first[1],
+      minY: first[1]
+    }
+  )
+  return {
+    pos: [box.minX, box.minY],
+    size: [box.maxX - box.minX, box.maxY - box.minY]
+  }
+}
+
 function ParticleSystem(maxCount, gravity, friction, ttl, angle, distance, speed) {
   this.maxCount = maxCount || 100
   this.gravity = gravity || [0, 0]
@@ -298,13 +323,22 @@ ParticleSystem.prototype.emit = function (n, parent) {
   }
 }
 
-ParticleSystem.prototype.update = function (dt) {
+ParticleSystem.prototype.update = function (dt, edges) {
   var self = this
+  edges = edges || []
   this.particles.forEach(function (p) {
     p.ttl -= dt
     p.v = p.v.add(self.gravity.mul(dt))
     p.v = p.v.mul(Math.pow(1 - self.friction, dt))
+    p.oldPos = p.pos
     p.pos = p.pos.add(p.v.mul(dt))
+    var edge = new Edge(p.oldPos, p.pos)
+    edges.forEach(function(e) {
+      if (e.intersects(edge)) {
+        p.v = p.v.reflect(e.normal).mul(.7)
+        p.pos = p.oldPos
+      }
+    })
   })
   this.particles = this.particles.filter(function(p) { return p.ttl > 0 })
   return this
